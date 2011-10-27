@@ -11,6 +11,11 @@ PLOY_VERSION=0.1.0
 if [ ! -d "$PLOY_DIR" ]; then
     export PLOY_DIR=$(cd $(dirname ${BASH_SOURCE[0]:-$0}); pwd)
     export PLOY_VERSION
+    mkdir -p $PLOY_DIR/recipes
+fi
+
+if [ -e "~/.ployrc" ]; then
+    . ~/.ployrc
 fi
 
 # Emulate curl with wget, if necessary
@@ -22,6 +27,7 @@ if [ ! `which curl` ]; then
             ARGS=${ARGS/--progress-bar /}
             ARGS=${ARGS/-C - /-c }
             ARGS=${ARGS/-o /-O }
+            ARGS=${ARGS/-f / }
 
             wget $ARGS
         }
@@ -49,6 +55,18 @@ deploy_package()
 
     RECIPE=$PLOY_DIR/recipes/$PACKAGE
 
+    if [ ! -e $RECIPE -a -n "$RECIPE_URL" ]; then
+        echo "Downloading recipe for $PACKAGE..."
+        curl -f -C - --progress-bar $RECIPE_URL/$PACKAGE -o $RECIPE
+        CODE=$?
+        if [ $CODE -eq 0 ]; then
+            echo "$PACKAGE recipe successfully downloaded to $RECIPE."
+        else
+            echo "Error when downloading recipe!"
+            return $CODE
+        fi
+    fi
+
     if [ -e $RECIPE ]; then
         source $RECIPE
     else
@@ -64,7 +82,7 @@ deploy_package()
     if (
         mkdir -p "$PLOY_DIR/src" && \
         cd "$PLOY_DIR/src" && \
-        curl -C - --progress-bar $URL | tar zxf - && \
+        curl -C - --progress-bar $URL -o - | tar zx && \
         cd $PACKAGE_NAME && \
         $INSTALL
         )
