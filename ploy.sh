@@ -14,10 +14,6 @@ if [ ! -d "$PLOY_DIR" ]; then
     mkdir -p $PLOY_DIR/recipes
 fi
 
-if [ -e "~/.ployrc" ]; then
-    . ~/.ployrc
-fi
-
 # Emulate curl with wget, if necessary
 if [ ! `which curl` ]; then
     if [ `which wget` ]; then
@@ -46,14 +42,9 @@ ploy_remote()
 deploy_package()
 {
     PACKAGE=$1
-
-    if [ $# -eq 1 ]; then
-        HOST=localhost
-    else
-        HOST=$2
-    fi
-
     RECIPE=$PLOY_DIR/recipes/$PACKAGE
+
+    test -e ~/.ployrc && . ~/.ployrc
 
     if [ ! -e $RECIPE -a -n "$RECIPE_URL" ]; then
         echo "Downloading recipe for $PACKAGE..."
@@ -62,20 +53,21 @@ deploy_package()
         if [ $CODE -eq 0 ]; then
             echo "$PACKAGE recipe successfully downloaded to $RECIPE."
         else
-            echo "Error when downloading recipe!"
+            rm -f $RECIPE
+            echo "Error downloading recipe."
             return $CODE
         fi
     fi
 
     if [ -e $RECIPE ]; then
-        source $RECIPE
+        . $RECIPE
     else
         echo "$PACKAGE: No such recipe!"
         return 1
     fi
 
     if [[ $($INSTALLED) == *$VERSION* ]]; then
-        echo "$PACKAGE $VERSION is already installed on $HOST."
+        echo "$PACKAGE $VERSION: Already installed."
         return
     fi
 
@@ -84,12 +76,12 @@ deploy_package()
         cd "$PLOY_DIR/src" && \
         curl -C - --progress-bar $URL -o - | tar zx && \
         cd $PACKAGE_NAME && \
-        $INSTALL
+        eval $INSTALL
         )
     then
-        echo "Success! $PACKAGE $VERSION installed on $HOST."
+        echo "$PACKAGE $VERSION: Installed."
     else
-        echo "Error: $PACKAGE $VERSION install failed on $HOST!"
+        echo "$PACKAGE $VERSION: Installation failed."
         return 1
     fi
 }
@@ -112,7 +104,7 @@ ploy()
         echo
       ;;
       * )
-        deploy_package $*
+          (deploy_package $*)
       ;;
     esac
   fi
